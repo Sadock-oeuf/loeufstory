@@ -177,6 +177,7 @@ import { useState, useEffect } from "react"
       const [menuData, setMenuData] = useState(initialMenuData);
       const [reservations, setReservations] = useState([]);
       const [isAdmin, setIsAdmin] = useState(false);
+      const [currentAdmin, setCurrentAdmin] = useState(null);
       const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
       const [selectedCategory, setSelectedCategory] = useState('casseroles');
 
@@ -194,7 +195,7 @@ import { useState, useEffect } from "react"
         switch(currentPage) {
           case 'menu': return <MenuPage menuData={menuData} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} />;
           case 'reservation': return <ReservationPage reservations={reservations} setReservations={setReservations} />;
-          case 'admin': return isAdmin ? <AdminPage menuData={menuData} setMenuData={setMenuData} reservations={reservations} setReservations={setReservations} setIsAdmin={setIsAdmin} /> : <LoginPage setIsAdmin={setIsAdmin} />;
+          case 'admin': return isAdmin ? <AdminPage menuData={menuData} setMenuData={setMenuData} reservations={reservations} setReservations={setReservations} setIsAdmin={setIsAdmin} currentAdmin={currentAdmin} /> : <LoginPage setIsAdmin={setIsAdmin} setCurrentAdmin={setCurrentAdmin} />;
           default: return <HomePage setCurrentPage={setCurrentPage} />;
         }
       };
@@ -562,18 +563,37 @@ import { useState, useEffect } from "react"
     }
 
     // PAGE LOGIN
-    function LoginPage({ setIsAdmin }) {
+    function LoginPage({ setIsAdmin, setCurrentAdmin }) {
+      const [username, setUsername] = useState('');
       const [password, setPassword] = useState('');
       const [error, setError] = useState('');
       const [showPassword, setShowPassword] = useState(false);
+      const [loading, setLoading] = useState(false);
 
-      const handleLogin = (e) => {
+      const handleLogin = async (e) => {
         e.preventDefault();
-        if (password === 'admin123') {
-          setIsAdmin(true);
-        } else {
-          setError('Mot de passe incorrect');
+        setLoading(true);
+        setError('');
+        
+        try {
+          const response = await fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            setCurrentAdmin(data.admin);
+            setIsAdmin(true);
+          } else {
+            setError(data.error || 'Identifiants incorrects');
+          }
+        } catch (err) {
+          setError('Erreur de connexion. Réessayez.');
         }
+        setLoading(false);
       };
 
       return (
@@ -588,22 +608,39 @@ import { useState, useEffect } from "react"
                 <p className="text-amber-600 mt-2">Connectez-vous pour gérer le restaurant</p>
               </div>
 
-              <form onSubmit={handleLogin}>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <input 
+                    type="text" 
+                    value={username} 
+                    onChange={(e) => { setUsername(e.target.value); setError(''); }} 
+                    className="w-full px-4 py-3 rounded-xl border-2 border-amber-200 focus:border-amber-500 focus:outline-none transition-colors" 
+                    placeholder="Nom d'utilisateur"
+                  />
+                </div>
                 <div className="relative">
-                  <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => { setPassword(e.target.value); setError(''); }} className="w-full px-4 py-3 rounded-xl border-2 border-amber-200 focus:border-amber-500 focus:outline-none transition-colors pr-12" placeholder="Mot de passe"/>
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    value={password} 
+                    onChange={(e) => { setPassword(e.target.value); setError(''); }} 
+                    className="w-full px-4 py-3 rounded-xl border-2 border-amber-200 focus:border-amber-500 focus:outline-none transition-colors pr-12" 
+                    placeholder="Mot de passe"
+                  />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-amber-400 hover:text-amber-600">
                     {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
                   </button>
                 </div>
                 
-                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                {error && <p className="text-red-500 text-sm">{error}</p>}
                 
-                <button type="submit" className="w-full mt-6 py-3 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 transition-colors">
-                  Se connecter
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full py-3 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Connexion...' : 'Se connecter'}
                 </button>
               </form>
-
-              <p className="text-center text-amber-400 text-sm mt-6">Mot de passe démo: admin123</p>
             </div>
           </div>
         </div>
@@ -611,11 +648,79 @@ import { useState, useEffect } from "react"
     }
 
     // PAGE ADMIN
-    function AdminPage({ menuData, setMenuData, reservations, setReservations, setIsAdmin }) {
+    function AdminPage({ menuData, setMenuData, reservations, setReservations, setIsAdmin, currentAdmin }) {
       const [activeTab, setActiveTab] = useState('reservations');
       const [editingCategory, setEditingCategory] = useState(null);
       const [editingItem, setEditingItem] = useState(null);
       const [newItem, setNewItem] = useState({ name: '', price: '', description: '' });
+      
+      // État pour les admins
+      const [admins, setAdmins] = useState([]);
+      const [newAdmin, setNewAdmin] = useState({ username: '', password: '', name: '' });
+      const [adminError, setAdminError] = useState('');
+      
+      // Charger les admins
+      useEffect(() => {
+        fetch('/api/admins')
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) setAdmins(data);
+          })
+          .catch(err => console.error('Erreur chargement admins:', err));
+      }, []);
+      
+      // Ajouter un admin
+      const handleAddAdmin = async (e) => {
+        e.preventDefault();
+        setAdminError('');
+        
+        if (!newAdmin.username || !newAdmin.password) {
+          setAdminError('Nom d\'utilisateur et mot de passe requis');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admins', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newAdmin)
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok) {
+            setAdmins([data, ...admins]);
+            setNewAdmin({ username: '', password: '', name: '' });
+          } else {
+            setAdminError(data.error || 'Erreur lors de l\'ajout');
+          }
+        } catch (err) {
+          setAdminError('Erreur de connexion');
+        }
+      };
+      
+      // Supprimer un admin
+      const handleDeleteAdmin = async (id) => {
+        if (id === currentAdmin?.id) {
+          alert('Vous ne pouvez pas supprimer votre propre compte!');
+          return;
+        }
+        
+        if (confirm('Supprimer cet administrateur?')) {
+          try {
+            const response = await fetch(`/api/admins?id=${id}`, { method: 'DELETE' });
+            const data = await response.json();
+            
+            if (response.ok) {
+              setAdmins(admins.filter(a => a.id !== id));
+            } else {
+              alert(data.error || 'Erreur lors de la suppression');
+            }
+          } catch (err) {
+            console.error('Erreur suppression admin:', err);
+          }
+        }
+      };
 
       const handleDeleteReservation = async (id) => {
         if (confirm('Supprimer cette réservation?')) {
@@ -677,20 +782,24 @@ import { useState, useEffect } from "react"
             <div className="flex justify-between items-center mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-amber-900">Console d'Administration</h1>
-                <p className="text-amber-600">Gérez votre menu et vos réservations</p>
+                <p className="text-amber-600">Bienvenue, {currentAdmin?.name || currentAdmin?.username || 'Admin'}</p>
               </div>
               <button onClick={() => setIsAdmin(false)} className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors">
                 <Icons.LogOut /> Déconnexion
               </button>
             </div>
 
-            <div className="flex gap-2 mb-8">
+            <div className="flex flex-wrap gap-2 mb-8">
               <button onClick={() => setActiveTab('reservations')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${activeTab === 'reservations' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-amber-700 hover:bg-amber-100'}`}>
                 <Icons.Calendar /> Réservations
               </button>
               <button onClick={() => setActiveTab('menu')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${activeTab === 'menu' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-amber-700 hover:bg-amber-100'}`}>
                 <Icons.ChefHat /> Gestion du Menu
               </button>
+              <button onClick={() => setActiveTab('admins')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${activeTab === 'admins' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-amber-700 hover:bg-amber-100'}`}>
+                <Icons.Settings /> Administrateurs
+              </button>
+            </div>
             </div>
 
             {activeTab === 'reservations' && (
@@ -818,6 +927,87 @@ import { useState, useEffect } from "react"
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ONGLET ADMINISTRATEURS */}
+            {activeTab === 'admins' && (
+              <div className="bg-white rounded-2xl shadow-xl p-6">
+                <h2 className="text-2xl font-bold text-amber-900 mb-6">Gestion des Administrateurs</h2>
+                
+                {/* Formulaire d'ajout */}
+                <div className="bg-amber-50 rounded-xl p-6 mb-8">
+                  <h3 className="font-semibold text-amber-800 mb-4 flex items-center gap-2">
+                    <Icons.Plus /> Ajouter un administrateur
+                  </h3>
+                  <form onSubmit={handleAddAdmin} className="grid md:grid-cols-4 gap-4">
+                    <input 
+                      type="text" 
+                      placeholder="Nom d'utilisateur" 
+                      value={newAdmin.username} 
+                      onChange={(e) => setNewAdmin({...newAdmin, username: e.target.value})} 
+                      className="px-4 py-2 rounded-lg border border-amber-200 focus:border-amber-500 focus:outline-none"
+                    />
+                    <input 
+                      type="password" 
+                      placeholder="Mot de passe" 
+                      value={newAdmin.password} 
+                      onChange={(e) => setNewAdmin({...newAdmin, password: e.target.value})} 
+                      className="px-4 py-2 rounded-lg border border-amber-200 focus:border-amber-500 focus:outline-none"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Nom complet (optionnel)" 
+                      value={newAdmin.name} 
+                      onChange={(e) => setNewAdmin({...newAdmin, name: e.target.value})} 
+                      className="px-4 py-2 rounded-lg border border-amber-200 focus:border-amber-500 focus:outline-none"
+                    />
+                    <button 
+                      type="submit" 
+                      className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Icons.Plus /> Ajouter
+                    </button>
+                  </form>
+                  {adminError && <p className="text-red-500 text-sm mt-2">{adminError}</p>}
+                </div>
+
+                {/* Liste des admins */}
+                <div className="space-y-3">
+                  {admins.map(admin => (
+                    <div key={admin.id} className="flex items-center justify-between p-4 bg-amber-50 rounded-xl">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-amber-200 rounded-full flex items-center justify-center">
+                          <span className="text-amber-800 font-bold">{admin.username.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-amber-900">{admin.name || admin.username}</p>
+                          <p className="text-sm text-amber-600">@{admin.username}</p>
+                        </div>
+                        {admin.id === currentAdmin?.id && (
+                          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">Vous</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-amber-400">
+                          Créé le {new Date(admin.created_at).toLocaleDateString('fr-CA')}
+                        </span>
+                        {admin.id !== currentAdmin?.id && (
+                          <button 
+                            onClick={() => handleDeleteAdmin(admin.id)} 
+                            className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {admins.length === 0 && (
+                    <p className="text-center text-amber-400 py-8">Aucun administrateur trouvé</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
