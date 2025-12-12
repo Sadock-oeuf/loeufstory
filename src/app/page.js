@@ -180,20 +180,15 @@ import { useState, useEffect } from "react"
       const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
       const [selectedCategory, setSelectedCategory] = useState('casseroles');
 
+      // Charger les réservations depuis l'API
       useEffect(() => {
-        const savedMenu = localStorage.getItem('loeufstory_menu');
-        const savedReservations = localStorage.getItem('loeufstory_reservations');
-        if (savedMenu) setMenuData(JSON.parse(savedMenu));
-        if (savedReservations) setReservations(JSON.parse(savedReservations));
+        fetch('/api/reservations')
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) setReservations(data);
+          })
+          .catch(err => console.error('Erreur chargement réservations:', err));
       }, []);
-
-      useEffect(() => {
-        localStorage.setItem('loeufstory_menu', JSON.stringify(menuData));
-      }, [menuData]);
-
-      useEffect(() => {
-        localStorage.setItem('loeufstory_reservations', JSON.stringify(reservations));
-      }, [reservations]);
 
       const renderPage = () => {
         switch(currentPage) {
@@ -465,15 +460,22 @@ import { useState, useEffect } from "react"
       const [submitted, setSubmitted] = useState(false);
       const [confirmationCode, setConfirmationCode] = useState('');
 
-      const handleSubmit = (e) => {
+      const handleSubmit = async (e) => {
         e.preventDefault();
-        const code = 'RES-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-        const newReservation = {
-          ...formData, id: Date.now(), code, status: 'confirmée', createdAt: new Date().toISOString()
-        };
-        setReservations([...reservations, newReservation]);
-        setConfirmationCode(code);
-        setSubmitted(true);
+        try {
+          const response = await fetch('/api/reservations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+          });
+          const newReservation = await response.json();
+          setReservations([...reservations, newReservation]);
+          setConfirmationCode(newReservation.code);
+          setSubmitted(true);
+        } catch (error) {
+          console.error('Erreur création réservation:', error);
+          alert('Erreur lors de la réservation. Veuillez réessayer.');
+        }
       };
 
       if (submitted) {
@@ -615,14 +617,29 @@ import { useState, useEffect } from "react"
       const [editingItem, setEditingItem] = useState(null);
       const [newItem, setNewItem] = useState({ name: '', price: '', description: '' });
 
-      const handleDeleteReservation = (id) => {
+      const handleDeleteReservation = async (id) => {
         if (confirm('Supprimer cette réservation?')) {
-          setReservations(reservations.filter(r => r.id !== id));
+          try {
+            await fetch(`/api/reservations?id=${id}`, { method: 'DELETE' });
+            setReservations(reservations.filter(r => r.id !== id));
+          } catch (error) {
+            console.error('Erreur suppression:', error);
+          }
         }
       };
 
-      const handleUpdateReservationStatus = (id, status) => {
-        setReservations(reservations.map(r => r.id === id ? {...r, status} : r));
+      const handleUpdateReservationStatus = async (id, status) => {
+        try {
+          const reservation = reservations.find(r => r.id === id);
+          await fetch('/api/reservations', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...reservation, status })
+          });
+          setReservations(reservations.map(r => r.id === id ? {...r, status} : r));
+        } catch (error) {
+          console.error('Erreur mise à jour:', error);
+        }
       };
 
       const handleAddMenuItem = (category) => {
