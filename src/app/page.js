@@ -18,7 +18,8 @@ import { useState, useEffect } from "react"
       LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
       Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
       EyeOff: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>,
-      ChefHat: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" y1="17" x2="18" y2="17"/></svg>
+      ChefHat: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" y1="17" x2="18" y2="17"/></svg>,
+      Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     };
 
     // DONNÉES INITIALES DU MENU
@@ -659,6 +660,21 @@ import { useState, useEffect } from "react"
       const [newAdmin, setNewAdmin] = useState({ username: '', password: '', name: '' });
       const [adminError, setAdminError] = useState('');
       
+      // État pour les employés
+      const [employees, setEmployees] = useState([]);
+      const [newEmployee, setNewEmployee] = useState({ name: '', role: '', phone: '', email: '', hourly_rate: '' });
+      const [editingEmployee, setEditingEmployee] = useState(null);
+      
+      // État pour les horaires
+      const [schedules, setSchedules] = useState([]);
+      const [newSchedule, setNewSchedule] = useState({ employee_id: '', date: '', start_time: '', end_time: '', notes: '' });
+      const [selectedWeek, setSelectedWeek] = useState(() => {
+        const today = new Date();
+        const day = today.getDay();
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+        return new Date(today.setDate(diff)).toISOString().split('T')[0];
+      });
+      
       // Charger les admins
       useEffect(() => {
         fetch('/api/admins')
@@ -668,6 +684,29 @@ import { useState, useEffect } from "react"
           })
           .catch(err => console.error('Erreur chargement admins:', err));
       }, []);
+      
+      // Charger les employés
+      useEffect(() => {
+        fetch('/api/employees')
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) setEmployees(data);
+          })
+          .catch(err => console.error('Erreur chargement employés:', err));
+      }, []);
+      
+      // Charger les horaires de la semaine sélectionnée
+      useEffect(() => {
+        const startDate = selectedWeek;
+        const endDate = new Date(new Date(selectedWeek).getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        
+        fetch(`/api/schedules?start=${startDate}&end=${endDate}`)
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) setSchedules(data);
+          })
+          .catch(err => console.error('Erreur chargement horaires:', err));
+      }, [selectedWeek]);
       
       // Ajouter un admin
       const handleAddAdmin = async (e) => {
@@ -720,6 +759,116 @@ import { useState, useEffect } from "react"
             console.error('Erreur suppression admin:', err);
           }
         }
+      };
+
+      // === FONCTIONS EMPLOYÉS ===
+      const handleAddEmployee = async (e) => {
+        e.preventDefault();
+        if (!newEmployee.name || !newEmployee.role) {
+          alert('Nom et rôle requis');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/employees', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newEmployee)
+          });
+          const data = await response.json();
+          if (response.ok) {
+            setEmployees([...employees, data]);
+            setNewEmployee({ name: '', role: '', phone: '', email: '', hourly_rate: '' });
+          }
+        } catch (err) {
+          console.error('Erreur ajout employé:', err);
+        }
+      };
+      
+      const handleUpdateEmployee = async (employee) => {
+        try {
+          const response = await fetch('/api/employees', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(employee)
+          });
+          const data = await response.json();
+          if (response.ok) {
+            setEmployees(employees.map(e => e.id === data.id ? data : e));
+            setEditingEmployee(null);
+          }
+        } catch (err) {
+          console.error('Erreur mise à jour employé:', err);
+        }
+      };
+      
+      const handleDeleteEmployee = async (id) => {
+        if (confirm('Supprimer cet employé? Ses horaires seront aussi supprimés.')) {
+          try {
+            await fetch(`/api/employees?id=${id}`, { method: 'DELETE' });
+            setEmployees(employees.filter(e => e.id !== id));
+            setSchedules(schedules.filter(s => s.employee_id !== id));
+          } catch (err) {
+            console.error('Erreur suppression employé:', err);
+          }
+        }
+      };
+      
+      // === FONCTIONS HORAIRES ===
+      const handleAddSchedule = async (e) => {
+        e.preventDefault();
+        if (!newSchedule.employee_id || !newSchedule.date || !newSchedule.start_time || !newSchedule.end_time) {
+          alert('Tous les champs sont requis');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/schedules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newSchedule)
+          });
+          const data = await response.json();
+          if (response.ok) {
+            setSchedules([...schedules, data]);
+            setNewSchedule({ ...newSchedule, employee_id: '', start_time: '', end_time: '', notes: '' });
+          }
+        } catch (err) {
+          console.error('Erreur ajout horaire:', err);
+        }
+      };
+      
+      const handleDeleteSchedule = async (id) => {
+        if (confirm('Supprimer cet horaire?')) {
+          try {
+            await fetch(`/api/schedules?id=${id}`, { method: 'DELETE' });
+            setSchedules(schedules.filter(s => s.id !== id));
+          } catch (err) {
+            console.error('Erreur suppression horaire:', err);
+          }
+        }
+      };
+      
+      // Fonctions utilitaires pour les dates
+      const getWeekDays = () => {
+        const days = [];
+        const start = new Date(selectedWeek);
+        for (let i = 0; i < 7; i++) {
+          const day = new Date(start);
+          day.setDate(start.getDate() + i);
+          days.push(day);
+        }
+        return days;
+      };
+      
+      const formatDate = (date) => {
+        return date.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric', month: 'short' });
+      };
+      
+      const changeWeek = (direction) => {
+        const current = new Date(selectedWeek);
+        current.setDate(current.getDate() + (direction * 7));
+        setSelectedWeek(current.toISOString().split('T')[0]);
       };
 
       const handleDeleteReservation = async (id) => {
@@ -796,10 +945,12 @@ import { useState, useEffect } from "react"
               <button onClick={() => setActiveTab('menu')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${activeTab === 'menu' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-amber-700 hover:bg-amber-100'}`}>
                 <Icons.ChefHat /> Gestion du Menu
               </button>
+              <button onClick={() => setActiveTab('employees')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${activeTab === 'employees' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-amber-700 hover:bg-amber-100'}`}>
+                <Icons.Users /> Employés
+              </button>
               <button onClick={() => setActiveTab('admins')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${activeTab === 'admins' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-amber-700 hover:bg-amber-100'}`}>
                 <Icons.Settings /> Administrateurs
               </button>
-            </div>
             </div>
 
             {activeTab === 'reservations' && (
@@ -930,6 +1081,251 @@ import { useState, useEffect } from "react"
               </div>
             )}
 
+            {/* ONGLET EMPLOYÉS */}
+            {activeTab === 'employees' && (
+              <div className="space-y-6">
+                {/* Section Liste des Employés */}
+                <div className="bg-white rounded-2xl shadow-xl p-6">
+                  <h2 className="text-2xl font-bold text-amber-900 mb-6">Gestion des Employés ({employees.length})</h2>
+                  
+                  {/* Formulaire d'ajout d'employé */}
+                  <div className="bg-amber-50 rounded-xl p-6 mb-6">
+                    <h3 className="font-semibold text-amber-800 mb-4 flex items-center gap-2">
+                      <Icons.Plus /> Ajouter un employé
+                    </h3>
+                    <form onSubmit={handleAddEmployee} className="grid md:grid-cols-6 gap-4">
+                      <input 
+                        type="text" 
+                        placeholder="Nom complet *" 
+                        value={newEmployee.name} 
+                        onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})} 
+                        className="px-4 py-2 rounded-lg border border-amber-200 focus:border-amber-500 focus:outline-none"
+                      />
+                      <select 
+                        value={newEmployee.role} 
+                        onChange={(e) => setNewEmployee({...newEmployee, role: e.target.value})} 
+                        className="px-4 py-2 rounded-lg border border-amber-200 focus:border-amber-500 focus:outline-none bg-white"
+                      >
+                        <option value="">Rôle *</option>
+                        <option value="Serveur">Serveur</option>
+                        <option value="Cuisinier">Cuisinier</option>
+                        <option value="Chef">Chef</option>
+                        <option value="Plongeur">Plongeur</option>
+                        <option value="Hôte">Hôte</option>
+                        <option value="Gérant">Gérant</option>
+                      </select>
+                      <input 
+                        type="tel" 
+                        placeholder="Téléphone" 
+                        value={newEmployee.phone} 
+                        onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})} 
+                        className="px-4 py-2 rounded-lg border border-amber-200 focus:border-amber-500 focus:outline-none"
+                      />
+                      <input 
+                        type="email" 
+                        placeholder="Email" 
+                        value={newEmployee.email} 
+                        onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})} 
+                        className="px-4 py-2 rounded-lg border border-amber-200 focus:border-amber-500 focus:outline-none"
+                      />
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        placeholder="Taux horaire ($)" 
+                        value={newEmployee.hourly_rate} 
+                        onChange={(e) => setNewEmployee({...newEmployee, hourly_rate: e.target.value})} 
+                        className="px-4 py-2 rounded-lg border border-amber-200 focus:border-amber-500 focus:outline-none"
+                      />
+                      <button 
+                        type="submit" 
+                        className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Icons.Plus /> Ajouter
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Liste des employés */}
+                  <div className="space-y-3">
+                    {employees.map(emp => (
+                      <div key={emp.id} className="flex items-center justify-between p-4 bg-amber-50 rounded-xl">
+                        {editingEmployee === emp.id ? (
+                          <div className="flex-1 grid md:grid-cols-5 gap-3">
+                            <input 
+                              type="text" 
+                              value={emp.name} 
+                              onChange={(e) => setEmployees(employees.map(e => e.id === emp.id ? {...e, name: e.target.value} : e))}
+                              className="px-3 py-2 rounded-lg border border-amber-200"
+                            />
+                            <select 
+                              value={emp.role} 
+                              onChange={(e) => setEmployees(employees.map(em => em.id === emp.id ? {...em, role: e.target.value} : em))}
+                              className="px-3 py-2 rounded-lg border border-amber-200 bg-white"
+                            >
+                              <option value="Serveur">Serveur</option>
+                              <option value="Cuisinier">Cuisinier</option>
+                              <option value="Chef">Chef</option>
+                              <option value="Plongeur">Plongeur</option>
+                              <option value="Hôte">Hôte</option>
+                              <option value="Gérant">Gérant</option>
+                            </select>
+                            <input 
+                              type="tel" 
+                              value={emp.phone || ''} 
+                              onChange={(e) => setEmployees(employees.map(em => em.id === emp.id ? {...em, phone: e.target.value} : em))}
+                              className="px-3 py-2 rounded-lg border border-amber-200"
+                              placeholder="Téléphone"
+                            />
+                            <input 
+                              type="number" 
+                              step="0.01"
+                              value={emp.hourly_rate || ''} 
+                              onChange={(e) => setEmployees(employees.map(em => em.id === emp.id ? {...em, hourly_rate: e.target.value} : em))}
+                              className="px-3 py-2 rounded-lg border border-amber-200"
+                              placeholder="Taux horaire"
+                            />
+                            <div className="flex gap-2">
+                              <button onClick={() => handleUpdateEmployee(emp)} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">
+                                <Icons.Save />
+                              </button>
+                              <button onClick={() => setEditingEmployee(null)} className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                                <Icons.X />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-4">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${emp.is_active ? 'bg-green-100' : 'bg-gray-200'}`}>
+                                <span className={`font-bold ${emp.is_active ? 'text-green-700' : 'text-gray-500'}`}>
+                                  {emp.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-semibold text-amber-900">{emp.name}</p>
+                                <p className="text-sm text-amber-600">{emp.role} {emp.hourly_rate && `• ${parseFloat(emp.hourly_rate).toFixed(2)}$/h`}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              {emp.phone && <span className="text-sm text-amber-500">{emp.phone}</span>}
+                              <div className="flex gap-2">
+                                <button onClick={() => setEditingEmployee(emp.id)} className="p-2 text-amber-600 hover:bg-amber-200 rounded-lg transition-colors">
+                                  <Icons.Edit />
+                                </button>
+                                <button onClick={() => handleDeleteEmployee(emp.id)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors">
+                                  <Icons.Trash />
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                    
+                    {employees.length === 0 && (
+                      <p className="text-center text-amber-400 py-8">Aucun employé. Ajoutez-en un ci-dessus.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Section Planification des Horaires */}
+                <div className="bg-white rounded-2xl shadow-xl p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-amber-900">Planification des Horaires</h2>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => changeWeek(-1)} className="p-2 hover:bg-amber-100 rounded-lg">←</button>
+                      <span className="font-medium text-amber-700">
+                        Semaine du {new Date(selectedWeek).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' })}
+                      </span>
+                      <button onClick={() => changeWeek(1)} className="p-2 hover:bg-amber-100 rounded-lg">→</button>
+                    </div>
+                  </div>
+                  
+                  {/* Formulaire d'ajout d'horaire */}
+                  <div className="bg-blue-50 rounded-xl p-4 mb-6">
+                    <h3 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                      <Icons.Plus /> Ajouter un horaire
+                    </h3>
+                    <form onSubmit={handleAddSchedule} className="grid md:grid-cols-6 gap-3">
+                      <select 
+                        value={newSchedule.employee_id} 
+                        onChange={(e) => setNewSchedule({...newSchedule, employee_id: e.target.value})}
+                        className="px-3 py-2 rounded-lg border border-blue-200 focus:border-blue-500 focus:outline-none bg-white"
+                      >
+                        <option value="">Employé *</option>
+                        {employees.filter(e => e.is_active).map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
+                        ))}
+                      </select>
+                      <input 
+                        type="date" 
+                        value={newSchedule.date} 
+                        onChange={(e) => setNewSchedule({...newSchedule, date: e.target.value})}
+                        className="px-3 py-2 rounded-lg border border-blue-200 focus:border-blue-500 focus:outline-none"
+                      />
+                      <input 
+                        type="time" 
+                        value={newSchedule.start_time} 
+                        onChange={(e) => setNewSchedule({...newSchedule, start_time: e.target.value})}
+                        className="px-3 py-2 rounded-lg border border-blue-200 focus:border-blue-500 focus:outline-none"
+                        placeholder="Début *"
+                      />
+                      <input 
+                        type="time" 
+                        value={newSchedule.end_time} 
+                        onChange={(e) => setNewSchedule({...newSchedule, end_time: e.target.value})}
+                        className="px-3 py-2 rounded-lg border border-blue-200 focus:border-blue-500 focus:outline-none"
+                        placeholder="Fin *"
+                      />
+                      <input 
+                        type="text" 
+                        value={newSchedule.notes} 
+                        onChange={(e) => setNewSchedule({...newSchedule, notes: e.target.value})}
+                        className="px-3 py-2 rounded-lg border border-blue-200 focus:border-blue-500 focus:outline-none"
+                        placeholder="Notes"
+                      />
+                      <button 
+                        type="submit" 
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Ajouter
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Calendrier de la semaine */}
+                  <div className="overflow-x-auto">
+                    <div className="grid grid-cols-7 gap-2 min-w-[700px]">
+                      {getWeekDays().map((day, idx) => (
+                        <div key={idx} className="border rounded-lg overflow-hidden">
+                          <div className={`p-2 text-center text-sm font-medium ${day.toDateString() === new Date().toDateString() ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-800'}`}>
+                            {formatDate(day)}
+                          </div>
+                          <div className="p-2 min-h-[150px] space-y-1">
+                            {schedules
+                              .filter(s => s.date === day.toISOString().split('T')[0])
+                              .map(schedule => (
+                                <div key={schedule.id} className="bg-blue-100 rounded p-2 text-xs group relative">
+                                  <div className="font-semibold text-blue-900">{schedule.employee_name}</div>
+                                  <div className="text-blue-700">{schedule.start_time?.slice(0,5)} - {schedule.end_time?.slice(0,5)}</div>
+                                  {schedule.notes && <div className="text-blue-500 truncate">{schedule.notes}</div>}
+                                  <button 
+                                    onClick={() => handleDeleteSchedule(schedule.id)}
+                                    className="absolute top-1 right-1 p-1 bg-red-100 text-red-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <Icons.X />
+                                  </button>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ONGLET ADMINISTRATEURS */}
             {activeTab === 'admins' && (
               <div className="bg-white rounded-2xl shadow-xl p-6">
@@ -1011,7 +1407,7 @@ import { useState, useEffect } from "react"
               </div>
             )}
           </div>
-        
+        </div>
       );
     }
 
