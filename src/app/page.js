@@ -211,7 +211,7 @@ import { useState, useEffect } from "react"
             <div className="max-w-7xl mx-auto px-4 py-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setCurrentPage('home')}>
-                  <img src="logo.png" alt="L'Oeufstory" className="h-16 md:h-20 group-hover:scale-105 transition-transform" />
+                  <img src="/logo.png" alt="L'Oeufstory" className="h-16 md:h-20 group-hover:scale-105 transition-transform" />
                 </div>
 
                 <nav className="hidden md:flex items-center gap-1">
