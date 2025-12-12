@@ -675,7 +675,7 @@ import { useState, useEffect } from "react"
         setAdminError('');
         
         if (!newAdmin.username || !newAdmin.password) {
-          setAdminError('Nom d\'utilisateur et mot de passe requis');
+          setAdminError("Nom d'utilisateur et mot de passe requis");
           return;
         }
         
@@ -692,7 +692,7 @@ import { useState, useEffect } from "react"
             setAdmins([data, ...admins]);
             setNewAdmin({ username: '', password: '', name: '' });
           } else {
-            setAdminError(data.error || 'Erreur lors de l\'ajout');
+            setAdminError(data.error || "Erreur lors de l'ajout");
           }
         } catch (err) {
           setAdminError('Erreur de connexion');

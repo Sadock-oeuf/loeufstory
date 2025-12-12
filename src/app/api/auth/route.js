@@ -20,7 +20,7 @@ export async function POST(request) {
     } else {
       return Response.json({ 
         success: false, 
-        error: 'Nom d\'utilisateur ou mot de passe incorrect' 
+        error: "Nom d'utilisateur ou mot de passe incorrect" 
       }, { status: 401 });
     }
   } catch (error) {

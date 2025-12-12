@@ -24,7 +24,7 @@ export async function POST(request) {
     // Vérifier si le username existe déjà
     const existing = await sql`SELECT id FROM admins WHERE username = ${username}`;
     if (existing.length > 0) {
-      return Response.json({ error: 'Ce nom d\'utilisateur existe déjà' }, { status: 400 });
+      return Response.json({ error: "Ce nom d'utilisateur existe déjà" }, { status: 400 });
     }
     
     const result = await sql`
