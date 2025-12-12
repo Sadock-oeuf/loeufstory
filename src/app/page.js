@@ -322,44 +322,53 @@ import { useState, useEffect } from "react"
             <h1 className="text-4xl md:text-5xl font-bold text-amber-900 text-center mb-4">Notre Menu</h1>
             <p className="text-center text-amber-600 mb-10">Découvrez toutes nos délicieuses créations</p>
 
-            <div className="mb-10 overflow-x-auto pb-4">
-              <div className="flex gap-2 min-w-max px-2">
-                {categories.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-4 py-2 rounded-full whitespace-nowrap font-medium transition-all text-sm ${
-                      selectedCategory === cat 
-                        ? 'bg-amber-600 text-white shadow-lg' 
-                        : 'bg-white text-amber-700 hover:bg-amber-100 shadow'
-                    }`}
-                  >
-                    {menuData[cat].title}
-                  </button>
-                ))}
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Sidebar des catégories - Vertical à gauche */}
+              <div className="md:w-64 flex-shrink-0">
+                <div className="bg-white rounded-2xl shadow-xl p-4 md:sticky md:top-24">
+                  <h3 className="font-bold text-amber-900 mb-4 text-lg border-b border-amber-200 pb-2">Catégories</h3>
+                  <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
+                    {categories.map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`px-4 py-3 rounded-xl whitespace-nowrap font-medium transition-all text-sm text-left ${
+                          selectedCategory === cat 
+                            ? 'bg-amber-600 text-white shadow-lg' 
+                            : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                        }`}
+                      >
+                        {menuData[cat].title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div className="bg-white rounded-2xl shadow-xl p-6 md:p-10">
-              <div className="border-b-2 border-amber-200 pb-4 mb-8">
-                <h2 className="text-3xl font-bold text-amber-900">{menuData[selectedCategory]?.title}</h2>
-                <p className="text-amber-600 mt-2">{menuData[selectedCategory]?.description}</p>
-              </div>
+              {/* Contenu du menu - À droite */}
+              <div className="flex-1">
+                <div className="bg-white rounded-2xl shadow-xl p-6 md:p-10">
+                  <div className="border-b-2 border-amber-200 pb-4 mb-8">
+                    <h2 className="text-3xl font-bold text-amber-900">{menuData[selectedCategory]?.title}</h2>
+                    <p className="text-amber-600 mt-2">{menuData[selectedCategory]?.description}</p>
+                  </div>
 
-              <div className="grid gap-6">
-                {menuData[selectedCategory]?.items?.length > 0 ? (
-                  menuData[selectedCategory].items.map(item => (
-                    <div key={item.id} className="flex justify-between items-start gap-4 pb-4 border-b border-amber-100 last:border-0 hover:bg-amber-50 rounded-lg p-3 -mx-3 transition-colors">
-                      <div className="flex-1">
-                        <h3 className="font-bold text-amber-900 text-lg">{item.name}</h3>
-                        <p className="text-amber-600 text-sm mt-1">{item.description}</p>
-                      </div>
-                      <span className="text-xl font-bold text-amber-700">{parseFloat(item.price).toFixed(2)}$</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-center text-amber-400 py-8">Aucun item dans cette catégorie</p>
-                )}
+                  <div className="grid gap-6">
+                    {menuData[selectedCategory]?.items?.length > 0 ? (
+                      menuData[selectedCategory].items.map(item => (
+                        <div key={item.id} className="flex justify-between items-start gap-4 pb-4 border-b border-amber-100 last:border-0 hover:bg-amber-50 rounded-lg p-3 -mx-3 transition-colors">
+                          <div className="flex-1">
+                            <h3 className="font-bold text-amber-900 text-lg">{item.name}</h3>
+                            <p className="text-amber-600 text-sm mt-1">{item.description}</p>
+                          </div>
+                          <span className="text-xl font-bold text-amber-700">{parseFloat(item.price).toFixed(2)}$</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-center text-amber-400 py-8">Aucun item dans cette catégorie</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
