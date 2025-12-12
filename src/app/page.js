@@ -22,38 +22,26 @@ import { useState, useEffect } from "react"
       Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     };
 
-    // MÉTADONNÉES DES CATÉGORIES DU MENU
-    const categoryMeta = {
-      casseroles: { title: "Les Casseroles", description: "Servies avec pommes de terre et sauce hollandaise" },
-      crepes: { title: "Les Crêpes", description: "Choix de mélange: nature, blé, sarrasin. Servies avec crème pâtissière." },
-      gaufres: { title: "Les Gaufres", description: "Servies avec crème anglaise" },
-      benedictine: { title: "Les Œufs Bénédictine", description: "Servis sur muffin anglais avec sauce hollandaise" },
-      omelettes: { title: "Les Omelettes", description: "Omelettes fraîches préparées à la commande" },
-      sectionOeufs: { title: "Section Œufs", description: "Servis avec patates déjeuner et fruits" },
-      poutines: { title: "Les Poutines Déjeuner", description: "Poutines pour le brunch" },
-      grilledCheese: { title: "Les Grilled Cheese", description: "Sandwichs grillés gourmands" },
-      salades: { title: "Les Salades & Midis", description: "Fraîches et légères" },
-      sandwichs: { title: "Les Sandwichs", description: "Avec 2 accompagnements au choix" }
-    };
-
     // COMPOSANT PRINCIPAL
     function LOeufstoryApp() {
       const [currentPage, setCurrentPage] = useState('home');
       const [menuItems, setMenuItems] = useState([]);
+      const [categories, setCategories] = useState([]);
       const [menuLoading, setMenuLoading] = useState(true);
       const [reservations, setReservations] = useState([]);
       const [isAdmin, setIsAdmin] = useState(false);
       const [currentAdmin, setCurrentAdmin] = useState(null);
       const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-      const [selectedCategory, setSelectedCategory] = useState('casseroles');
+      const [selectedCategory, setSelectedCategory] = useState(null);
 
       // Fonction pour transformer les items plats en structure par catégorie
       const getMenuData = () => {
         const menuData = {};
-        Object.keys(categoryMeta).forEach(cat => {
-          menuData[cat] = {
-            ...categoryMeta[cat],
-            items: menuItems.filter(item => item.category === cat).map(item => ({
+        categories.forEach(cat => {
+          menuData[cat.key] = {
+            title: cat.title,
+            description: cat.description || '',
+            items: menuItems.filter(item => item.category === cat.key).map(item => ({
               id: item.id,
               name: item.name,
               price: parseFloat(item.price),
@@ -65,6 +53,21 @@ import { useState, useEffect } from "react"
       };
       
       const menuData = getMenuData();
+
+      // Charger les catégories depuis l'API
+      useEffect(() => {
+        fetch('/api/categories')
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) {
+              setCategories(data);
+              if (data.length > 0 && !selectedCategory) {
+                setSelectedCategory(data[0].key);
+              }
+            }
+          })
+          .catch(err => console.error('Erreur chargement catégories:', err));
+      }, []);
 
       // Charger le menu depuis l'API
       useEffect(() => {
@@ -92,9 +95,9 @@ import { useState, useEffect } from "react"
 
       const renderPage = () => {
         switch(currentPage) {
-          case 'menu': return <MenuPage menuData={menuData} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} menuLoading={menuLoading} />;
+          case 'menu': return <MenuPage menuData={menuData} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} menuLoading={menuLoading} categories={categories} />;
           case 'reservation': return <ReservationPage reservations={reservations} setReservations={setReservations} />;
-          case 'admin': return isAdmin ? <AdminPage menuItems={menuItems} setMenuItems={setMenuItems} reservations={reservations} setReservations={setReservations} setIsAdmin={setIsAdmin} currentAdmin={currentAdmin} /> : <LoginPage setIsAdmin={setIsAdmin} setCurrentAdmin={setCurrentAdmin} />;
+          case 'admin': return isAdmin ? <AdminPage menuItems={menuItems} setMenuItems={setMenuItems} categories={categories} setCategories={setCategories} reservations={reservations} setReservations={setReservations} setIsAdmin={setIsAdmin} currentAdmin={currentAdmin} /> : <LoginPage setIsAdmin={setIsAdmin} setCurrentAdmin={setCurrentAdmin} />;
           default: return <HomePage setCurrentPage={setCurrentPage} />;
         }
       };
@@ -302,10 +305,9 @@ import { useState, useEffect } from "react"
     }
 
     // PAGE MENU
-    function MenuPage({ menuData, selectedCategory, setSelectedCategory, menuLoading }) {
-      const categories = Object.keys(menuData);
+    function MenuPage({ menuData, selectedCategory, setSelectedCategory, menuLoading, categories }) {
       
-      if (menuLoading) {
+      if (menuLoading || categories.length === 0) {
         return (
           <div className="py-20">
             <div className="max-w-7xl mx-auto px-4 text-center">
@@ -328,17 +330,17 @@ import { useState, useEffect } from "react"
                 <div className="bg-white rounded-2xl shadow-xl p-4 md:sticky md:top-24">
                   <h3 className="font-bold text-amber-900 mb-4 text-lg border-b border-amber-200 pb-2">Catégories</h3>
                   <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
-                    {categories.map(cat => (
+                    {categories.filter(c => c.is_active).map(cat => (
                       <button
-                        key={cat}
-                        onClick={() => setSelectedCategory(cat)}
+                        key={cat.key}
+                        onClick={() => setSelectedCategory(cat.key)}
                         className={`px-4 py-3 rounded-xl whitespace-nowrap font-medium transition-all text-sm text-left ${
-                          selectedCategory === cat 
+                          selectedCategory === cat.key 
                             ? 'bg-amber-600 text-white shadow-lg' 
                             : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
                         }`}
                       >
-                        {menuData[cat].title}
+                        {cat.title}
                       </button>
                     ))}
                   </div>
@@ -571,20 +573,25 @@ import { useState, useEffect } from "react"
     }
 
     // PAGE ADMIN
-    function AdminPage({ menuItems, setMenuItems, reservations, setReservations, setIsAdmin, currentAdmin }) {
+    function AdminPage({ menuItems, setMenuItems, categories, setCategories, reservations, setReservations, setIsAdmin, currentAdmin }) {
       const [activeTab, setActiveTab] = useState('reservations');
       const [editingCategory, setEditingCategory] = useState(null);
       const [editingItem, setEditingItem] = useState(null);
       const [editingItemData, setEditingItemData] = useState({ name: '', price: '', description: '' });
       const [newItem, setNewItem] = useState({ name: '', price: '', description: '' });
       
+      // État pour la gestion des catégories
+      const [newCategory, setNewCategory] = useState({ title: '', description: '' });
+      const [editingCategoryData, setEditingCategoryData] = useState(null);
+      
       // Transformer les items plats en structure par catégorie pour l'affichage
       const getMenuData = () => {
         const menuData = {};
-        Object.keys(categoryMeta).forEach(cat => {
-          menuData[cat] = {
-            ...categoryMeta[cat],
-            items: menuItems.filter(item => item.category === cat).map(item => ({
+        categories.forEach(cat => {
+          menuData[cat.key] = {
+            title: cat.title,
+            description: cat.description || '',
+            items: menuItems.filter(item => item.category === cat.key).map(item => ({
               id: item.id,
               name: item.name,
               price: parseFloat(item.price),
@@ -607,6 +614,73 @@ import { useState, useEffect } from "react"
       const saveEditingItem = async (category, itemId) => {
         await handleUpdateMenuItem(category, itemId, editingItemData);
         setEditingItem(null);
+      };
+      
+      // === FONCTIONS CATÉGORIES ===
+      const handleAddCategory = async (e) => {
+        e.preventDefault();
+        if (!newCategory.title) {
+          alert('Le titre est requis');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newCategory)
+          });
+          const data = await response.json();
+          if (response.ok) {
+            setCategories([...categories, data]);
+            setNewCategory({ title: '', description: '' });
+          } else {
+            alert(data.error || "Erreur lors de l'ajout");
+          }
+        } catch (err) {
+          console.error('Erreur ajout catégorie:', err);
+        }
+      };
+      
+      const handleUpdateCategory = async (cat) => {
+        try {
+          const response = await fetch('/api/categories', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cat)
+          });
+          const data = await response.json();
+          if (response.ok) {
+            setCategories(categories.map(c => c.id === data.id ? data : c));
+            setEditingCategoryData(null);
+          }
+        } catch (err) {
+          console.error('Erreur mise à jour catégorie:', err);
+        }
+      };
+      
+      const handleDeleteCategory = async (id) => {
+        const cat = categories.find(c => c.id === id);
+        const itemCount = menuItems.filter(i => i.category === cat?.key).length;
+        
+        if (itemCount > 0) {
+          alert(`Cette catégorie contient ${itemCount} item(s). Supprimez-les d'abord.`);
+          return;
+        }
+        
+        if (confirm('Supprimer cette catégorie?')) {
+          try {
+            const response = await fetch(`/api/categories?id=${id}`, { method: 'DELETE' });
+            const data = await response.json();
+            if (response.ok) {
+              setCategories(categories.filter(c => c.id !== id));
+            } else {
+              alert(data.error || 'Erreur lors de la suppression');
+            }
+          } catch (err) {
+            console.error('Erreur suppression catégorie:', err);
+          }
+        }
       };
       
       // État pour les admins
@@ -1008,22 +1082,115 @@ import { useState, useEffect } from "react"
 
             {activeTab === 'menu' && (
               <div className="space-y-6">
+                {/* Section Gestion des Catégories */}
                 <div className="bg-white rounded-2xl shadow-xl p-6">
-                  <h2 className="text-2xl font-bold text-amber-900 mb-4">Sélectionner une catégorie</h2>
+                  <h2 className="text-2xl font-bold text-amber-900 mb-4">Gestion des Catégories</h2>
+                  
+                  {/* Formulaire d'ajout de catégorie */}
+                  <div className="bg-green-50 rounded-xl p-4 mb-6">
+                    <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
+                      <Icons.Plus /> Ajouter une catégorie
+                    </h4>
+                    <form onSubmit={handleAddCategory} className="grid md:grid-cols-3 gap-3">
+                      <input 
+                        type="text" 
+                        placeholder="Titre de la catégorie *" 
+                        value={newCategory.title} 
+                        onChange={(e) => setNewCategory({...newCategory, title: e.target.value})} 
+                        className="px-3 py-2 rounded-lg border border-green-200 focus:border-green-500 focus:outline-none"
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Description" 
+                        value={newCategory.description} 
+                        onChange={(e) => setNewCategory({...newCategory, description: e.target.value})} 
+                        className="px-3 py-2 rounded-lg border border-green-200 focus:border-green-500 focus:outline-none"
+                      />
+                      <button 
+                        type="submit" 
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Icons.Plus /> Ajouter
+                      </button>
+                    </form>
+                  </div>
+                  
+                  {/* Liste des catégories */}
+                  <div className="space-y-2">
+                    {categories.map(cat => (
+                      <div key={cat.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl">
+                        {editingCategoryData?.id === cat.id ? (
+                          <div className="flex-1 grid md:grid-cols-3 gap-3">
+                            <input 
+                              type="text" 
+                              value={editingCategoryData.title} 
+                              onChange={(e) => setEditingCategoryData({...editingCategoryData, title: e.target.value})}
+                              className="px-3 py-2 rounded-lg border border-amber-200"
+                            />
+                            <input 
+                              type="text" 
+                              value={editingCategoryData.description || ''} 
+                              onChange={(e) => setEditingCategoryData({...editingCategoryData, description: e.target.value})}
+                              className="px-3 py-2 rounded-lg border border-amber-200"
+                              placeholder="Description"
+                            />
+                            <div className="flex gap-2">
+                              <button onClick={() => handleUpdateCategory(editingCategoryData)} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">
+                                <Icons.Save />
+                              </button>
+                              <button onClick={() => setEditingCategoryData(null)} className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+                                <Icons.X />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex-1">
+                              <span className="font-semibold text-amber-900">{cat.title}</span>
+                              <span className="text-amber-500 text-sm ml-2">({cat.key})</span>
+                              {cat.description && <p className="text-sm text-amber-600">{cat.description}</p>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-amber-400 mr-2">
+                                {menuItems.filter(i => i.category === cat.key).length} items
+                              </span>
+                              <button onClick={() => setEditingCategoryData({...cat})} className="p-2 text-amber-600 hover:bg-amber-200 rounded-lg">
+                                <Icons.Edit />
+                              </button>
+                              <button onClick={() => handleDeleteCategory(cat.id)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg">
+                                <Icons.Trash />
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Section Sélection de catégorie pour items */}
+                <div className="bg-white rounded-2xl shadow-xl p-6">
+                  <h2 className="text-2xl font-bold text-amber-900 mb-4">Gestion des Items du Menu</h2>
+                  <p className="text-amber-600 mb-4">Sélectionnez une catégorie pour gérer ses items</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                    {Object.keys(menuData).map(cat => (
-                      <button key={cat} onClick={() => setEditingCategory(editingCategory === cat ? null : cat)} className={`px-4 py-3 rounded-xl text-sm font-medium transition-all ${editingCategory === cat ? 'bg-amber-600 text-white shadow-lg' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
-                        {menuData[cat].title}
+                    {categories.map(cat => (
+                      <button 
+                        key={cat.key} 
+                        onClick={() => setEditingCategory(editingCategory === cat.key ? null : cat.key)} 
+                        className={`px-4 py-3 rounded-xl text-sm font-medium transition-all ${editingCategory === cat.key ? 'bg-amber-600 text-white shadow-lg' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}
+                      >
+                        {cat.title}
+                        <span className="block text-xs opacity-75">{menuData[cat.key]?.items?.length || 0} items</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {editingCategory && (
+                {editingCategory && menuData[editingCategory] && (
                   <div className="bg-white rounded-2xl shadow-xl p-6">
                     <div className="flex justify-between items-center mb-6">
                       <h3 className="text-xl font-bold text-amber-900">{menuData[editingCategory].title}</h3>
-                      <span className="text-amber-500">{menuData[editingCategory].items.length} items</span>
+                      <span className="text-amber-500">{menuData[editingCategory].items?.length || 0} items</span>
                     </div>
 
                     <div className="bg-amber-50 rounded-xl p-4 mb-6">
@@ -1041,7 +1208,7 @@ import { useState, useEffect } from "react"
                     </div>
 
                     <div className="space-y-3">
-                      {menuData[editingCategory].items.map(item => (
+                      {menuData[editingCategory].items?.map(item => (
                         <div key={item.id} className="flex items-start gap-4 p-4 bg-amber-50 rounded-xl">
                           {editingItem === item.id ? (
                             <>
@@ -1080,6 +1247,9 @@ import { useState, useEffect } from "react"
                           )}
                         </div>
                       ))}
+                      {(!menuData[editingCategory].items || menuData[editingCategory].items.length === 0) && (
+                        <p className="text-center text-amber-400 py-8">Aucun item dans cette catégorie</p>
+                      )}
                     </div>
                   </div>
                 )}
