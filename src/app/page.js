@@ -830,11 +830,20 @@ import { useState, useEffect } from "react"
           });
           const data = await response.json();
           if (response.ok) {
-            setSchedules([...schedules, data]);
+            // Recharger les horaires de la semaine
+            const startDate = selectedWeek;
+            const endDate = new Date(new Date(selectedWeek).getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const refreshRes = await fetch(`/api/schedules?start=${startDate}&end=${endDate}`);
+            const refreshData = await refreshRes.json();
+            if (Array.isArray(refreshData)) setSchedules(refreshData);
+            
             setNewSchedule({ ...newSchedule, employee_id: '', start_time: '', end_time: '', notes: '' });
+          } else {
+            alert(data.error || 'Erreur lors de l\'ajout');
           }
         } catch (err) {
           console.error('Erreur ajout horaire:', err);
+          alert('Erreur de connexion');
         }
       };
       
@@ -1303,7 +1312,11 @@ import { useState, useEffect } from "react"
                           </div>
                           <div className="p-2 min-h-[150px] space-y-1">
                             {schedules
-                              .filter(s => s.date === day.toISOString().split('T')[0])
+                              .filter(s => {
+                                const scheduleDate = s.date?.split('T')[0];
+                                const calendarDate = day.toISOString().split('T')[0];
+                                return scheduleDate === calendarDate;
+                              })
                               .map(schedule => (
                                 <div key={schedule.id} className="bg-blue-100 rounded p-2 text-xs group relative">
                                   <div className="font-semibold text-blue-900">{schedule.employee_name}</div>
