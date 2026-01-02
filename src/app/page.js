@@ -542,8 +542,8 @@ function HomePage({ menuData, categories, selectedCategory, setSelectedCategory,
             </div>
             
             <div className="flex flex-col sm:flex-row items-center gap-6 text-stone-500 font-body text-xs">
-              <span>📍 123 Rue Principale, Québec</span>
-              <span>📞 +1 (418) 123-4567</span>
+              <span>📍 165 Bd Taschereau, La Prairie, QC J5R 6G8</span>
+              <span>📞 +1 (450) 907-4166</span>
             </div>
             
             <p className="font-body text-[10px] text-stone-600">© 2024 L'Oeufstory</p>
